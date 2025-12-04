@@ -1,8 +1,9 @@
 {
   "expo": {
-    "name": "cash-flow",
+    "name": "FlowLy",
     "slug": "cash-flow",
-    "version": "1.0.0",
+    "scheme": "cashflow",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -13,9 +14,12 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cashflow.calculator"
     },
     "android": {
+      "package": "com.cashflow.calculator",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -25,6 +29,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "a02b6fc1-b676-495b-b80b-1eefad35a9da"
+      }
     }
   }
 }
