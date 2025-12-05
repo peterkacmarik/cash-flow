@@ -8,7 +8,7 @@ import {
     Alert,
     TouchableOpacity,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { TabView, SceneMap, TabBar } from 'react-native-tab-view';
 import { useTranslation } from 'react-i18next';
 import InputForm from '../components/InputForm';
@@ -186,7 +186,7 @@ export default function HomeScreen() {
     );
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
             <StatusBar barStyle={theme === 'dark' ? "light-content" : "dark-content"} backgroundColor={colors.background} />
             <TabView
                 navigationState={{ index, routes }}
@@ -205,7 +205,7 @@ export default function HomeScreen() {
                 onClose={() => setTemplateModalVisible(false)}
                 onSelectTemplate={handleLoadTemplate}
             />
-        </SafeAreaView>
+        </View>
     );
 }
 
