@@ -149,4 +149,167 @@ export const dataService = {
             }
         }
     },
+
+    // --- EXPENSES ---
+
+    async getExpenses(userId?: string): Promise<any[]> {
+        if (userId) {
+            const { data, error } = await supabase
+                .from('expenses')
+                .select('*')
+                .order('date', { ascending: false });
+
+            if (error) {
+                console.error('Error loading expenses from Supabase:', error);
+                throw error;
+            }
+            return data.map(item => ({
+                id: item.id,
+                amount: item.amount,
+                category: item.category,
+                date: item.date,
+                description: item.description,
+                createdAt: item.created_at,
+            }));
+        } else {
+            try {
+                const data = await AsyncStorage.getItem('@expenses');
+                return data ? JSON.parse(data) : [];
+            } catch (error) {
+                console.error('Failed to load local expenses', error);
+                return [];
+            }
+        }
+    },
+
+    async saveExpense(expense: any, userId?: string): Promise<void> {
+        if (userId) {
+            const { error } = await supabase
+                .from('expenses')
+                .insert({
+                    user_id: userId,
+                    amount: expense.amount,
+                    category: expense.category,
+                    date: expense.date,
+                    description: expense.description,
+                });
+
+            if (error) {
+                console.error('Error saving expense to Supabase:', error);
+                throw error;
+            }
+        } else {
+            const expenses = await this.getExpenses();
+            // Handle update vs insert for local storage
+            const existingIndex = expenses.findIndex((e: any) => e.id === expense.id);
+            if (existingIndex >= 0) {
+                expenses[existingIndex] = expense;
+            } else {
+                expenses.push(expense);
+            }
+            await AsyncStorage.setItem('@expenses', JSON.stringify(expenses));
+        }
+    },
+
+    async deleteExpense(id: string, userId?: string): Promise<void> {
+        if (userId) {
+            const { error } = await supabase.from('expenses').delete().eq('id', id);
+            if (error) throw error;
+        } else {
+            const expenses = await this.getExpenses();
+            const filtered = expenses.filter((e: any) => e.id !== id);
+            await AsyncStorage.setItem('@expenses', JSON.stringify(filtered));
+        }
+    },
+
+    // --- CATEGORIES ---
+
+    async getCategories(userId?: string): Promise<any[]> {
+        const defaultCategories = [
+            { id: 'food', name: 'Food & Dining', icon: '🍔', color: '#FF6B6B', budget: 0, isCustom: false },
+            { id: 'transport', name: 'Transportation', icon: '🚗', color: '#4ECDC4', budget: 0, isCustom: false },
+            { id: 'housing', name: 'Housing', icon: '🏠', color: '#45B7D1', budget: 0, isCustom: false },
+            { id: 'healthcare', name: 'Healthcare', icon: '💊', color: '#96CEB4', budget: 0, isCustom: false },
+            { id: 'entertainment', name: 'Entertainment', icon: '🎬', color: '#FFEAA7', budget: 0, isCustom: false },
+            { id: 'shopping', name: 'Shopping', icon: '👕', color: '#DFE6E9', budget: 0, isCustom: false },
+            { id: 'education', name: 'Education', icon: '📚', color: '#74B9FF', budget: 0, isCustom: false },
+            { id: 'savings', name: 'Savings', icon: '💰', color: '#55EFC4', budget: 0, isCustom: false },
+            { id: 'gifts', name: 'Gifts', icon: '🎁', color: '#FD79A8', budget: 0, isCustom: false },
+            { id: 'bills', name: 'Bills', icon: '📱', color: '#A29BFE', budget: 0, isCustom: false },
+        ];
+
+        if (userId) {
+            const { data, error } = await supabase.from('categories').select('*');
+            if (error) throw error;
+
+            // Merge logic: DB custom vs Defaults
+            const dbCategories = data.map((item: any) => ({
+                id: item.id,
+                name: item.name,
+                icon: item.icon,
+                color: item.color,
+                budget: item.budget,
+                isCustom: item.is_custom,
+            }));
+
+            const merged = [...dbCategories];
+
+            // Add defaults that are not present in DB
+            defaultCategories.forEach(defCat => {
+                if (!merged.find(c => c.id === defCat.id)) {
+                    merged.push(defCat);
+                }
+            });
+
+            return merged;
+        } else {
+            try {
+                const data = await AsyncStorage.getItem('@categories');
+                if (data) return JSON.parse(data);
+                await AsyncStorage.setItem('@categories', JSON.stringify(defaultCategories));
+                return defaultCategories;
+            } catch (error) {
+                return defaultCategories;
+            }
+        }
+    },
+
+    async saveCategory(category: any, userId?: string): Promise<void> {
+        if (userId) {
+            // Upsert based on ID
+            const { error } = await supabase
+                .from('categories')
+                .upsert({
+                    id: category.id,
+                    user_id: userId,
+                    name: category.name,
+                    icon: category.icon,
+                    color: category.color,
+                    budget: category.budget,
+                    is_custom: category.isCustom,
+                    updated_at: new Date().toISOString(),
+                });
+            if (error) throw error;
+        } else {
+            const categories = await this.getCategories();
+            const existingIndex = categories.findIndex((c: any) => c.id === category.id);
+            if (existingIndex >= 0) {
+                categories[existingIndex] = category;
+            } else {
+                categories.push(category);
+            }
+            await AsyncStorage.setItem('@categories', JSON.stringify(categories));
+        }
+    },
+
+    async deleteCategory(id: string, userId?: string): Promise<void> {
+        if (userId) {
+            const { error } = await supabase.from('categories').delete().eq('id', id);
+            if (error) throw error;
+        } else {
+            const categories = await this.getCategories();
+            const filtered = categories.filter((c: any) => c.id !== id);
+            await AsyncStorage.setItem('@categories', JSON.stringify(filtered));
+        }
+    },
 };

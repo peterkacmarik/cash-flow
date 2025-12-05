@@ -9,21 +9,18 @@ import {
     Alert,
 } from 'react-native';
 import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { Expense, Category, CategorySpending } from '../types/expense';
 import {
-    loadCategories,
     getCurrentMonth,
     getMonthlyData,
     getCategorySpending,
-    saveExpense,
-    deleteExpense,
     updateCategoryBudget,
     generateId,
-    saveCategory,
-    deleteCategory,
 } from '../utils/expenseStorage';
+import { dataService } from '../services/dataService';
 import ExpenseCard from '../components/ExpenseCard';
 import CategoryBudgetCard from '../components/CategoryBudgetCard';
 import BudgetInputModal from '../components/BudgetInputModal';
@@ -35,6 +32,7 @@ import ExpenseOptionsModal from '../components/ExpenseOptionsModal';
 export default function ExpensesScreen() {
     const { t } = useTranslation();
     const { colors } = useSettings();
+    const { user } = useAuth(); // Get user
     const [activeTab, setActiveTab] = useState<'overview' | 'expenses' | 'categories'>('overview');
     const [currentMonth, setCurrentMonth] = useState(getCurrentMonth());
     const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -84,19 +82,47 @@ export default function ExpensesScreen() {
 
     const loadData = async () => {
         try {
-            const [cats, monthlyData, catSpending] = await Promise.all([
-                loadCategories(),
-                getMonthlyData(currentMonth),
-                getCategorySpending(currentMonth),
+            // Load from secure service
+            const [cats, secureExpenses] = await Promise.all([
+                dataService.getCategories(user?.id),
+                dataService.getExpenses(user?.id),
             ]);
 
+            // Filter by month (client-side for now, could move to service)
+            const monthlyExpenses = secureExpenses.filter(e => e.date.startsWith(currentMonth));
+
+            // Re-calculate stats based on loaded data (logic from expenseStorage but applied here)
+            // Or better: update expenseStorage utils to accept data instead of loading it themselves.
+            // For now, let's minimally adapt the existing utils logic inline or mock functionality.
+
+            // NOTE: The existing getMonthlyData / getCategorySpending utils heavily rely on internal loading.
+            // Correct approach: Refactor utils to accept data as arguments.
+            // SHORTCUT for this task: Re-implement the aggregation logic here using the data we just fetched.
+
+            const totalSpentCalc = monthlyExpenses.reduce((sum, e) => sum + e.amount, 0);
+            const budgetTotalCalc = cats.reduce((sum: number, c: any) => sum + (c.budget || 0), 0);
+
+            const catSpendingCalc = cats.map((category: any) => {
+                const catExpenses = monthlyExpenses.filter((e) => e.category === category.id);
+                const spent = catExpenses.reduce((sum, e) => sum + e.amount, 0);
+                const percentage = category.budget > 0 ? (spent / category.budget) * 100 : 0;
+                return {
+                    category,
+                    spent,
+                    budget: category.budget || 0,
+                    percentage,
+                    isOverBudget: spent > (category.budget || 0) && (category.budget || 0) > 0,
+                };
+            });
+
+
             setCategories(cats);
-            setExpenses(monthlyData.expenses.sort((a, b) =>
+            setExpenses(monthlyExpenses.sort((a, b) =>
                 new Date(b.date).getTime() - new Date(a.date).getTime()
             ));
-            setTotalSpent(monthlyData.totalSpent);
-            setTotalBudget(monthlyData.budgetTotal);
-            setCategorySpending(catSpending);
+            setTotalSpent(totalSpentCalc);
+            setTotalBudget(budgetTotalCalc);
+            setCategorySpending(catSpendingCalc);
         } catch (error) {
             console.error('Failed to load expense data', error);
         }
@@ -122,7 +148,7 @@ export default function ExpensesScreen() {
                 createdAt: editingExpense?.createdAt || new Date().toISOString(),
             };
 
-            await saveExpense(expense);
+            await dataService.saveExpense(expense, user?.id);
             setModalVisible(false);
             setEditingExpense(undefined);
             await loadData();
@@ -142,7 +168,7 @@ export default function ExpensesScreen() {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await deleteExpense(expense.id);
+                            await dataService.deleteExpense(expense.id, user?.id);
                             await loadData();
                         } catch (error) {
                             Alert.alert(t('common.error'), t('expenses.deleteError'));
@@ -169,7 +195,7 @@ export default function ExpensesScreen() {
 
     const handleSaveCategory = async (category: Category) => {
         try {
-            await saveCategory(category);
+            await dataService.saveCategory(category, user?.id);
             setCategoryModal({ visible: false, category: undefined });
             await loadData();
         } catch (error) {
@@ -195,7 +221,7 @@ export default function ExpensesScreen() {
                                 return;
                             }
 
-                            await deleteCategory(category.id);
+                            await dataService.deleteCategory(category.id, user?.id);
                             await loadData();
                         } catch (error) {
                             Alert.alert(t('common.error'), t('categories.deleteError'));
@@ -310,7 +336,9 @@ export default function ExpensesScreen() {
                             `${t('expenses.setBudget')} - ${cs.category.name}`,
                             cs.category.budget,
                             async (value) => {
-                                await updateCategoryBudget(cs.category.id, value);
+                                // Update category budget via dataService
+                                const updatedCategory = { ...cs.category, budget: value, isCustom: true };
+                                await dataService.saveCategory(updatedCategory, user?.id);
                                 await loadData();
                             }
                         );
