@@ -101,6 +101,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 Alert.alert('Chyba', error.message);
                 return false;
             }
+
+            // Wait for Supabase to establish the session
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Manually fetch and set the user to ensure immediate state update
+            const currentUser = await authService.getCurrentUser();
+
+            if (currentUser) {
+                setUser(currentUser);
+                setIsGuest(false);
+            }
+
             return true;
         } catch (error) {
             console.error('Google sign in error:', error);

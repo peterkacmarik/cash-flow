@@ -38,23 +38,23 @@ export const authService = {
         };
     },
 
-
-
     // Sign in with Google
     async signInWithGoogle(): Promise<{ error: AuthError | null }> {
         try {
+            // Generate the redirect URL for Expo Go
             const redirectUrl = makeRedirectUri({
-                scheme: 'cashflow',
                 path: 'auth/callback',
             });
-
-            console.log('Redirect URL:', redirectUrl);
 
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
                     redirectTo: redirectUrl,
                     skipBrowserRedirect: true,
+                    queryParams: {
+                        access_type: 'offline',
+                        prompt: 'consent',
+                    },
                 },
             });
 
@@ -62,7 +62,36 @@ export const authService = {
 
             if (data?.url) {
                 const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
-                console.log('Browser Result:', result);
+
+                if (result.type === 'success' && result.url) {
+                    // Parse parameters from the URL
+                    const url = new URL(result.url);
+                    const code = url.searchParams.get('code');
+                    const hash = url.hash.substring(1);
+
+                    // Handle Implicit Flow (tokens in hash)
+                    if (hash) {
+                        const params = new URLSearchParams(hash);
+                        const access_token = params.get('access_token');
+                        const refresh_token = params.get('refresh_token');
+
+                        if (access_token && refresh_token) {
+                            const { error: sessionError } = await supabase.auth.setSession({
+                                access_token,
+                                refresh_token,
+                            });
+                            if (sessionError) throw sessionError;
+                            return { error: null };
+                        }
+                    }
+
+                    // Handle PKCE Flow (code in query params)
+                    if (code) {
+                        const { error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
+                        if (sessionError) throw sessionError;
+                        return { error: null };
+                    }
+                }
             }
 
             return { error: null };

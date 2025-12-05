@@ -37,6 +37,8 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
+    const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
     const validateForm = (): boolean => {
         const newErrors: { email?: string; password?: string } = {};
 
@@ -67,10 +69,20 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
     };
 
     const handleGoogleLogin = async () => {
-        setLoading(true);
-        await signInWithGoogle();
-        setLoading(false);
+        setIsGoogleLoading(true);
+        const success = await signInWithGoogle();
+        if (!success) {
+            setIsGoogleLoading(false);
+        }
     };
+
+    if (isGoogleLoading) {
+        return (
+            <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+        );
+    }
 
     return (
         <KeyboardAvoidingView
@@ -191,7 +203,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                 <TouchableOpacity
                     style={[styles.googleButton, { borderColor: colors.border }]}
                     onPress={handleGoogleLogin}
-                    disabled={loading}
+                    disabled={loading || isGoogleLoading}
                 >
                     <Ionicons name="logo-google" size={24} color="#DB4437" />
                     <Text style={[styles.googleButtonText, { color: colors.text }]}>
