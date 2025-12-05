@@ -11,7 +11,8 @@ import ExpenseBreakdownChart from './charts/ExpenseBreakdownChart';
 import ChartCarousel from './charts/ChartCarousel';
 import { Scenario } from '../types/scenario';
 import { generatePDFReport } from '../utils/pdfGenerator';
-import { saveReport } from '../utils/reportStorage';
+import { dataService } from '../services/dataService';
+import { useAuth } from '../context/AuthContext';
 import { Report } from '../types/report';
 
 interface ResultsDisplayProps {
@@ -22,6 +23,7 @@ interface ResultsDisplayProps {
 export default function ResultsDisplay({ results, inputs }: ResultsDisplayProps) {
     const { t } = useTranslation();
     const { currency, colors } = useSettings();
+    const { user } = useAuth();
     const currencySymbol = getCurrencySymbol(currency);
     const [pdfModalVisible, setPdfModalVisible] = useState(false);
     const [reportName, setReportName] = useState('');
@@ -40,27 +42,40 @@ export default function ResultsDisplay({ results, inputs }: ResultsDisplayProps)
 
         setGenerating(true);
         try {
-            const fileUri = await generatePDFReport(
-                reportName,
-                inputs,
-                results,
-                currency
-            );
+            let fileUri = undefined;
+            if (!user) {
+                // Generate PDF immediately for guests
+                fileUri = await generatePDFReport(
+                    reportName,
+                    inputs,
+                    results,
+                    currency
+                );
+            }
 
+            // For authenticated users, we just save the data and generate PDF on demand
             const report: Report = {
-                id: Date.now().toString(),
+                id: Date.now().toString(), // Will be ignored by Supabase or replaced with UUID
                 name: reportName.trim(),
                 scenarioName: reportName.trim(),
+                type: 'cashFlow',
                 createdAt: new Date().toISOString(),
-                fileUri,
+                fileUri: fileUri,
+                inputs: user ? inputs : undefined,
+                results: user ? results : undefined,
             };
 
-            await saveReport(report);
+            await dataService.saveReport(report, user?.id);
             setPdfModalVisible(false);
-            setReportName('');
-            Alert.alert(t('common.success'), t('reports.reportGenerated'));
+
+            // Defer success alert to allow modal to close smoothly
+            setTimeout(() => {
+                setReportName('');
+                Alert.alert(t('common.success'), t('reports.reportGenerated'));
+            }, 500);
+
         } catch (error) {
-            console.error('Error generating PDF:', error);
+            console.error('Error generating/saving report:', error);
             Alert.alert(t('common.error'), t('reports.reportGenerationError'));
         } finally {
             setGenerating(false);

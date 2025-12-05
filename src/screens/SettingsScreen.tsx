@@ -11,9 +11,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { Currency, getCurrencySymbol, getCurrencyName } from '../utils/settings';
 import { changeLanguage } from '../i18n';
-import { deleteAllScenarios } from '../utils/storage';
-import { deleteAllProfitTimerCalculations } from '../utils/profitTimerStorage';
-import { deleteAllReports } from '../utils/reportStorage';
+import { dataService } from '../services/dataService';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -62,12 +60,22 @@ export default function SettingsScreen({ onScenariosDeleted }: SettingsScreenPro
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await deleteAllScenarios();
-                            notifyDataChanged(); // Notify context
-                            if (onScenariosDeleted) {
-                                onScenariosDeleted();
-                            }
-                            Alert.alert(t('common.success'), t('settings.deleteAllScenariosSuccess'));
+                            await dataService.deleteAllScenarios(user?.id);
+                            Alert.alert(
+                                t('common.success'),
+                                t('settings.deleteAllScenariosSuccess'),
+                                [
+                                    {
+                                        text: 'OK',
+                                        onPress: () => {
+                                            notifyDataChanged();
+                                            if (onScenariosDeleted) {
+                                                onScenariosDeleted();
+                                            }
+                                        }
+                                    }
+                                ]
+                            );
                         } catch (error) {
                             Alert.alert(t('common.error'), t('settings.deleteAllScenariosError'));
                         }
@@ -88,9 +96,19 @@ export default function SettingsScreen({ onScenariosDeleted }: SettingsScreenPro
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await deleteAllProfitTimerCalculations();
-                            notifyDataChanged();
-                            Alert.alert(t('common.success'), t('settings.deleteAllProfitTimerCalculationsSuccess'));
+                            await dataService.deleteAllProfitTimers(user?.id);
+                            Alert.alert(
+                                t('common.success'),
+                                t('settings.deleteAllProfitTimerCalculationsSuccess'),
+                                [
+                                    {
+                                        text: 'OK',
+                                        onPress: () => {
+                                            notifyDataChanged();
+                                        }
+                                    }
+                                ]
+                            );
                         } catch (error) {
                             Alert.alert(t('common.error'), t('settings.deleteAllProfitTimerCalculationsError'));
                         }
@@ -111,9 +129,19 @@ export default function SettingsScreen({ onScenariosDeleted }: SettingsScreenPro
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await deleteAllReports();
-                            notifyDataChanged();
-                            Alert.alert(t('common.success'), t('reports.deleteAllSuccess'));
+                            await dataService.deleteAllReports(user?.id);
+                            Alert.alert(
+                                t('common.success'),
+                                t('reports.deleteAllSuccess'),
+                                [
+                                    {
+                                        text: 'OK',
+                                        onPress: () => {
+                                            notifyDataChanged();
+                                        }
+                                    }
+                                ]
+                            );
                         } catch (error) {
                             Alert.alert(t('common.error'), t('reports.deleteAllError'));
                         }

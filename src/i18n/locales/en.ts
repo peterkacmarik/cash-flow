@@ -12,6 +12,8 @@ export default {
         close: 'Close',
         reset: 'Reset',
         edit: 'Edit',
+        ok: 'OK',
+        invalidNumbers: 'Please enter valid numbers',
     },
     tabs: {
         inputs: 'Inputs',
@@ -163,6 +165,7 @@ export default {
         updateCalculation: 'Update',
         baseScenario: 'Base Scenario',
         calculator: 'Calculator',
+        reportName: 'Profit Timer Report - {{name}}',
     },
     expenses: {
         overview: 'Overview',
@@ -181,6 +184,7 @@ export default {
         ofBudget: 'of budget',
         recentExpenses: 'Recent Expenses',
         noExpenses: 'No expenses',
+        addFirst: 'Add your first expense',
         addFirstExpense: 'Add your first expense using the + button',
         deleteTitle: 'Delete Expense',
         deleteConfirm: 'Are you sure you want to delete this expense?',
@@ -251,6 +255,7 @@ export default {
         reportName: 'Report Name',
         enterReportName: 'Enter report name',
         reportGenerated: 'Report generated successfully',
+        generated: 'Report generated successfully',
         reportGenerationError: 'Failed to generate report',
         noReports: 'No saved reports',
         noReportsSubtext: 'Create a calculation and generate a PDF report',
@@ -270,6 +275,12 @@ export default {
         deleteAllSuccess: 'All reports deleted successfully',
         renameError: 'Failed to rename report',
         createdAt: 'Created',
+        tabs: {
+            cashFlow: 'Cash Flow',
+            expenses: 'Expenses',
+            profitTimer: 'Profit Timer',
+        },
+        comingSoon: 'Coming Soon',
     },
     auth: {
         welcome: 'Welcome',

@@ -12,6 +12,8 @@ import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
+import { TabView, SceneMap, TabBar } from 'react-native-tab-view';
+import { useWindowDimensions } from 'react-native';
 import { Expense, Category, CategorySpending } from '../types/expense';
 import {
     getCurrentMonth,
@@ -30,10 +32,18 @@ import CategoryOptionsModal from '../components/CategoryOptionsModal';
 import ExpenseOptionsModal from '../components/ExpenseOptionsModal';
 
 export default function ExpensesScreen() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const { colors } = useSettings();
     const { user } = useAuth(); // Get user
-    const [activeTab, setActiveTab] = useState<'overview' | 'expenses' | 'categories'>('overview');
+    const layout = useWindowDimensions();
+
+    const [index, setIndex] = useState(0);
+    const routes = React.useMemo(() => [
+        { key: 'overview', title: t('expenses.overview') },
+        { key: 'expenses', title: t('expenses.allExpenses') },
+        { key: 'categories', title: t('expenses.categories') },
+    ], [t, i18n.language]);
+
     const [currentMonth, setCurrentMonth] = useState(getCurrentMonth());
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
@@ -351,38 +361,36 @@ export default function ExpensesScreen() {
         </ScrollView>
     );
 
+    const OverviewRoute = () => renderOverview();
+    const ExpensesRoute = () => renderExpenses();
+    const CategoriesRoute = () => renderCategories();
+
+    const renderScene = SceneMap({
+        overview: OverviewRoute,
+        expenses: ExpensesRoute,
+        categories: CategoriesRoute,
+    });
+
+    const renderTabBar = (props: any) => (
+        <TabBar
+            {...props}
+            indicatorStyle={[styles.indicator, { backgroundColor: colors.primary }]}
+            style={[styles.tabBar, { backgroundColor: colors.tabBar, borderBottomColor: colors.border }]}
+            labelStyle={styles.label}
+            activeColor={colors.tabBarActive}
+            inactiveColor={colors.tabBarInactive}
+        />
+    );
+
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-            <View style={[styles.tabBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'overview' && [styles.tabActive, { borderBottomColor: colors.primary }]]}
-                    onPress={() => setActiveTab('overview')}
-                >
-                    <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'overview' && [styles.tabTextActive, { color: colors.primary }]]}>
-                        {t('expenses.overview')}
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'expenses' && [styles.tabActive, { borderBottomColor: colors.primary }]]}
-                    onPress={() => setActiveTab('expenses')}
-                >
-                    <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'expenses' && [styles.tabTextActive, { color: colors.primary }]]}>
-                        {t('expenses.allExpenses')}
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'categories' && [styles.tabActive, { borderBottomColor: colors.primary }]]}
-                    onPress={() => setActiveTab('categories')}
-                >
-                    <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'categories' && [styles.tabTextActive, { color: colors.primary }]]}>
-                        {t('expenses.categories')}
-                    </Text>
-                </TouchableOpacity>
-            </View>
-
-            {activeTab === 'overview' && renderOverview()}
-            {activeTab === 'expenses' && renderExpenses()}
-            {activeTab === 'categories' && renderCategories()}
+            <TabView
+                navigationState={{ index, routes }}
+                renderScene={renderScene}
+                onIndexChange={setIndex}
+                initialLayout={{ width: layout.width }}
+                renderTabBar={renderTabBar}
+            />
 
             <TouchableOpacity
                 style={styles.fab}
@@ -447,28 +455,20 @@ const styles = StyleSheet.create({
         backgroundColor: '#f5f6fa',
     },
     tabBar: {
-        flexDirection: 'row',
         backgroundColor: '#fff',
+        elevation: 0,
+        shadowOpacity: 0,
         borderBottomWidth: 1,
         borderBottomColor: '#ecf0f1',
+        paddingTop: 0,
     },
-    tab: {
-        flex: 1,
-        paddingVertical: 16,
-        alignItems: 'center',
+    indicator: {
+        backgroundColor: '#3498db',
+        height: 3,
     },
-    tabActive: {
-        borderBottomWidth: 3,
-        borderBottomColor: '#3498db',
-    },
-    tabText: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: '#7f8c8d',
-    },
-    tabTextActive: {
-        color: '#3498db',
+    label: {
         fontWeight: '600',
+        fontSize: 14,
     },
     tabContent: {
         flex: 1,

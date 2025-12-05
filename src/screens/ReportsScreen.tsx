@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -8,28 +8,47 @@ import {
     Alert,
     TextInput,
     Modal,
+    useWindowDimensions,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Ionicons } from '@expo/vector-icons';
-import { useSettings } from '../context/SettingsContext';
-import { Report } from '../types/report';
-import { loadReports, deleteReport, renameReport } from '../utils/reportStorage';
+import { TabView, SceneMap, TabBar } from 'react-native-tab-view';
 import { useFocusEffect } from '@react-navigation/native';
 
+import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/AuthContext';
+import { Report } from '../types/report';
+import { dataService } from '../services/dataService';
+import { generatePDFReport } from '../utils/pdfGenerator';
+
 export default function ReportsScreen() {
-    const { t } = useTranslation();
-    const { colors } = useSettings();
+    const { t, i18n } = useTranslation();
+    const { colors, currency, dataVersion } = useSettings();
+    const { user } = useAuth();
+    const layout = useWindowDimensions();
+
+    // TabView state
+    const [index, setIndex] = useState(0);
+    const routes = React.useMemo(() => [
+        { key: 'cashFlow', title: t('reports.tabs.cashFlow') },
+        { key: 'expenses', title: t('reports.tabs.expenses') },
+        { key: 'profitTimer', title: t('reports.tabs.profitTimer') },
+    ], [t, i18n.language]);
+
+    // Reports state
     const [reports, setReports] = useState<Report[]>([]);
     const [loading, setLoading] = useState(true);
+
+    // Modal state
     const [renameModalVisible, setRenameModalVisible] = useState(false);
     const [selectedReport, setSelectedReport] = useState<Report | null>(null);
     const [newName, setNewName] = useState('');
 
     const fetchReports = async () => {
         try {
-            const loadedReports = await loadReports();
+            const loadedReports = await dataService.getReports(user?.id);
             setReports(loadedReports.sort((a, b) =>
                 new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
             ));
@@ -43,14 +62,50 @@ export default function ReportsScreen() {
     useFocusEffect(
         useCallback(() => {
             fetchReports();
-        }, [])
+        }, [user?.id, dataVersion])
     );
+
+    const cashFlowReports = reports.filter(r => r.type === 'cashFlow' || !r.type);
+    const profitTimerReports = reports.filter(r => r.type === 'profitTimer');
+
+    const getReportUri = async (report: Report): Promise<string | null> => {
+        if (report.fileUri && (await FileSystem.getInfoAsync(report.fileUri)).exists) {
+            return report.fileUri;
+        }
+
+        if (report.inputs && report.results) {
+            try {
+                // Determine currency based on inputs (fallback to global currency if not inferable)
+                // Existing logic assumes global currency which might be mismatched for old reports if currency changed
+                // But for now we stick to global 'currency' context or we should save currency in report
+
+                const uri = await generatePDFReport(
+                    report.name,
+                    report.inputs,
+                    report.results,
+                    currency,
+                    report.type
+                );
+                return uri;
+            } catch (error) {
+                console.error('Error generating PDF on demand:', error);
+                return null;
+            }
+        }
+        return null;
+    };
 
     const handleShare = async (report: Report) => {
         try {
+            const uri = await getReportUri(report);
+            if (!uri) {
+                Alert.alert(t('common.error'), t('reports.fileNotFound'));
+                return;
+            }
+
             const isAvailable = await Sharing.isAvailableAsync();
             if (isAvailable) {
-                await Sharing.shareAsync(report.fileUri);
+                await Sharing.shareAsync(uri);
             } else {
                 Alert.alert(t('common.error'), 'Sharing is not available on this device');
             }
@@ -62,22 +117,23 @@ export default function ReportsScreen() {
 
     const handleDownload = async (report: Report) => {
         try {
-            // Get the Downloads directory
-            const downloadDir = FileSystem.documentDirectory + 'Download/';
+            const uri = await getReportUri(report);
+            if (!uri) {
+                Alert.alert(t('common.error'), t('reports.fileNotFound'));
+                return;
+            }
 
-            // Create Download directory if it doesn't exist
+            const downloadDir = FileSystem.documentDirectory + 'Download/';
             const dirInfo = await FileSystem.getInfoAsync(downloadDir);
             if (!dirInfo.exists) {
                 await FileSystem.makeDirectoryAsync(downloadDir, { intermediates: true });
             }
 
-            // Create filename with timestamp to avoid conflicts
             const fileName = `${report.name.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.pdf`;
             const downloadPath = downloadDir + fileName;
 
-            // Copy the file to Downloads
             await FileSystem.copyAsync({
-                from: report.fileUri,
+                from: uri,
                 to: downloadPath,
             });
 
@@ -102,7 +158,7 @@ export default function ReportsScreen() {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await deleteReport(report.id);
+                            await dataService.deleteReport(report.id, user?.id);
                             await fetchReports();
                         } catch (error) {
                             Alert.alert(t('common.error'), t('reports.deleteError'));
@@ -123,11 +179,14 @@ export default function ReportsScreen() {
         if (!selectedReport || !newName.trim()) return;
 
         try {
-            await renameReport(selectedReport.id, newName.trim());
+            await dataService.renameReport(selectedReport.id, newName.trim(), user?.id);
             setRenameModalVisible(false);
-            setSelectedReport(null);
-            setNewName('');
-            await fetchReports();
+
+            setTimeout(async () => {
+                setSelectedReport(null);
+                setNewName('');
+                await fetchReports();
+            }, 500);
         } catch (error) {
             Alert.alert(t('common.error'), t('reports.renameError'));
         }
@@ -183,26 +242,76 @@ export default function ReportsScreen() {
         );
     };
 
-    const renderEmpty = () => (
+    const renderEmpty = (type: 'cashFlow' | 'profitTimer' | 'expenses') => (
         <View style={styles.emptyContainer}>
             <Ionicons name="document-text-outline" size={64} color={colors.textSecondary} />
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                {t('reports.noReports')}
+                {type === 'cashFlow' ? t('reports.noReports') :
+                    type === 'profitTimer' ? t('reports.noProfitTimerReports') :
+                        t('reports.noReports')}
             </Text>
-            <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                {t('reports.noReportsSubtext')}
+            {type === 'cashFlow' && (
+                <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+                    {t('reports.noReportsSubtext')}
+                </Text>
+            )}
+        </View>
+    );
+
+    const CashFlowRoute = () => (
+        <FlatList
+            data={cashFlowReports}
+            renderItem={renderReport}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={() => renderEmpty('cashFlow')}
+        />
+    );
+
+    const ProfitTimerRoute = () => (
+        <FlatList
+            data={profitTimerReports}
+            renderItem={renderReport}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={() => renderEmpty('profitTimer')}
+        />
+    );
+
+    const ComingSoonRoute = () => (
+        <View style={styles.emptyContainer}>
+            <Ionicons name="construct-outline" size={64} color={colors.textSecondary} />
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                {t('reports.comingSoon')}
             </Text>
         </View>
     );
 
+    const renderScene = SceneMap({
+        cashFlow: CashFlowRoute,
+        expenses: ComingSoonRoute,
+        profitTimer: ProfitTimerRoute,
+    });
+
+    const renderTabBar = (props: any) => (
+        <TabBar
+            {...props}
+            indicatorStyle={[styles.indicator, { backgroundColor: colors.primary }]}
+            style={[styles.tabBar, { backgroundColor: colors.tabBar, borderBottomColor: colors.border }]}
+            labelStyle={styles.label}
+            activeColor={colors.tabBarActive}
+            inactiveColor={colors.tabBarInactive}
+        />
+    );
+
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-            <FlatList
-                data={reports}
-                renderItem={renderReport}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={styles.listContent}
-                ListEmptyComponent={renderEmpty}
+            <TabView
+                navigationState={{ index, routes }}
+                renderScene={renderScene}
+                onIndexChange={setIndex}
+                initialLayout={{ width: layout.width }}
+                renderTabBar={renderTabBar}
             />
 
             <Modal
@@ -251,6 +360,22 @@ export default function ReportsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
+    tabBar: {
+        backgroundColor: '#fff',
+        elevation: 0,
+        shadowOpacity: 0,
+        borderBottomWidth: 1,
+        borderBottomColor: '#ecf0f1',
+        paddingTop: 0,
+    },
+    indicator: {
+        backgroundColor: '#3498db',
+        height: 3,
+    },
+    label: {
+        fontWeight: '600',
+        fontSize: 14,
     },
     listContent: {
         padding: 16,

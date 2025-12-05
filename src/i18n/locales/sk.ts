@@ -12,6 +12,8 @@ export default {
         close: 'Zavrieť',
         reset: 'Reset',
         edit: 'Upraviť',
+        ok: 'OK',
+        invalidNumbers: 'Prosím zadajte platné čísla',
     },
     tabs: {
         inputs: 'Vstupné údaje',
@@ -147,6 +149,7 @@ export default {
         updateCalculation: 'Aktualizovať',
         baseScenario: 'Základný scenár',
         calculator: 'Kalkulačka',
+        reportName: 'Profit Timer Report - {{name}}',
     },
     expenses: {
         overview: 'Prehľad',
@@ -165,6 +168,7 @@ export default {
         ofBudget: 'z rozpočtu',
         recentExpenses: 'Posledné výdavky',
         noExpenses: 'Žiadne výdavky',
+        addFirst: 'Pridajte svoj prvý výdavok',
         addFirstExpense: 'Pridajte svoj prvý výdavok pomocou tlačidla +',
         deleteTitle: 'Vymazať výdavok',
         deleteConfirm: 'Naozaj chcete vymazať tento výdavok?',
@@ -235,6 +239,7 @@ export default {
         reportName: 'Názov reportu',
         enterReportName: 'Zadajte názov reportu',
         reportGenerated: 'Report bol úspešne vygenerovaný',
+        generated: 'Report bol úspešne vygenerovaný',
         reportGenerationError: 'Nepodarilo sa vygenerovať report',
         noReports: 'Žiadne uložené reporty',
         noReportsSubtext: 'Vytvorte výpočet a vygenerujte PDF report',
@@ -254,6 +259,12 @@ export default {
         deleteAllSuccess: 'Všetky reporty boli úspešne vymazané',
         renameError: 'Nepodarilo sa premenovať report',
         createdAt: 'Vytvorené',
+        tabs: {
+            cashFlow: 'Cash Flow',
+            expenses: 'Výdavky',
+            profitTimer: 'Profit Timer',
+        },
+        comingSoon: 'Pripravujeme',
     },
     auth: {
         welcome: 'Vitajte',
