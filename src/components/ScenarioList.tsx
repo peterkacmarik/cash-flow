@@ -10,13 +10,13 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Scenario } from '../types/scenario';
-import { getScenario, loadScenarios, deleteScenario } from '../utils/storage';
 import { calculateCashFlow } from '../utils/calculations';
 import { useSettings } from '../context/SettingsContext';
 import { getCurrencySymbol } from '../utils/settings';
 import { Ionicons } from '@expo/vector-icons';
 import RenameScenarioModal from './RenameScenarioModal';
-import { renameScenario } from '../utils/storage';
+import { dataService } from '../services/dataService';
+import { useAuth } from '../context/AuthContext';
 
 interface ScenarioListProps {
     onLoadScenario: (scenario: Scenario) => void;
@@ -25,6 +25,7 @@ interface ScenarioListProps {
 export default function ScenarioList({ onLoadScenario }: Omit<ScenarioListProps, 'refreshTrigger'>) {
     const { t } = useTranslation();
     const { currency, dataVersion, colors } = useSettings();
+    const { user } = useAuth(); // Get user for dataService
     const currencySymbol = getCurrencySymbol(currency);
     const [scenarios, setScenarios] = useState<Scenario[]>([]);
     const [loading, setLoading] = useState(true);
@@ -33,12 +34,12 @@ export default function ScenarioList({ onLoadScenario }: Omit<ScenarioListProps,
 
     useEffect(() => {
         loadScenariosData();
-    }, [dataVersion]);
+    }, [dataVersion, user]); // Reload when user changes
 
     const loadScenariosData = async () => {
         setLoading(true);
         try {
-            const data = await loadScenarios();
+            const data = await dataService.getScenarios(user?.id);
             // Sort by date descending
             data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
             setScenarios(data);
@@ -61,7 +62,7 @@ export default function ScenarioList({ onLoadScenario }: Omit<ScenarioListProps,
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await deleteScenario(scenario.id);
+                            await dataService.deleteScenario(scenario.id, user?.id);
                             loadScenariosData();
                         } catch (error) {
                             Alert.alert(t('common.error'), t('scenarios.deleteError'));
@@ -80,7 +81,7 @@ export default function ScenarioList({ onLoadScenario }: Omit<ScenarioListProps,
     const handleRenameSave = async (newName: string) => {
         if (scenarioToRename) {
             try {
-                await renameScenario(scenarioToRename.id, newName);
+                await dataService.renameScenario(scenarioToRename.id, newName, user?.id);
                 loadScenariosData();
             } catch (error) {
                 Alert.alert(t('common.error'), t('scenarios.renameError'));

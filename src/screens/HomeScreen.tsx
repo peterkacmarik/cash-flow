@@ -1,14 +1,11 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
     View,
-    Text,
-    StyleSheet,
     StatusBar,
     Dimensions,
     Alert,
-    TouchableOpacity,
+    StyleSheet,
 } from 'react-native';
-
 import { TabView, SceneMap, TabBar } from 'react-native-tab-view';
 import { useTranslation } from 'react-i18next';
 import InputForm from '../components/InputForm';
@@ -17,12 +14,13 @@ import ScenarioList from '../components/ScenarioList';
 import SaveScenarioModal from '../components/SaveScenarioModal';
 import TemplateSelectionModal from '../components/TemplateSelectionModal';
 import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/AuthContext';
 import {
     PropertyInputs,
     CalculationResults,
     calculateCashFlow,
 } from '../utils/calculations';
-import { saveScenario, updateScenario } from '../utils/storage';
+import { dataService } from '../services/dataService';
 import { Scenario } from '../types/scenario';
 import { PropertyTemplate } from '../types/template';
 
@@ -47,6 +45,7 @@ const initialInputs: PropertyInputs = {
 export default function HomeScreen() {
     const { t, i18n } = useTranslation();
     const { notifyDataChanged, colors, theme } = useSettings();
+    const { user } = useAuth(); // Get user for dataService
     const [inputs, setInputs] = useState<PropertyInputs>(initialInputs);
     const [results, setResults] = useState<CalculationResults | null>(null);
     const [index, setIndex] = useState(0);
@@ -79,7 +78,7 @@ export default function HomeScreen() {
     const handleConfirmSave = async (name: string) => {
         if (tempInputs) {
             try {
-                await saveScenario(name, tempInputs);
+                await dataService.saveScenario(name, tempInputs, user?.id);
                 notifyDataChanged();
                 Alert.alert(t('common.success'), t('scenarios.saveSuccess'));
             } catch (error) {
@@ -100,7 +99,7 @@ export default function HomeScreen() {
     const handleUpdateScenario = async (values: PropertyInputs) => {
         if (loadedScenario) {
             try {
-                await updateScenario(loadedScenario.id, values);
+                await dataService.updateScenario(loadedScenario.id, values, user?.id);
                 notifyDataChanged();
                 setLoadedScenario(null); // Reset to allow creating new scenarios
                 setInputs(initialInputs); // Reset form to default values
