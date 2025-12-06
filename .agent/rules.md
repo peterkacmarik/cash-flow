@@ -20,6 +20,10 @@ description: Global rules for the Cash Flow project
     - Žiadne `any` (pokiaľ nie je absolútne nevyhnutné).
     - Žiadne `console.log` v produkčnom kóde.
 
+4.  **Bezpečnosť:**
+    - **NIKDY** nepíš citlivé údaje (API kľúče, heslá) priamo do kódu.
+    - Použi `.env` súbor a importuj ich (napr. cez `react-native-dotenv`).
+
 ---
 
 # Project Rules
