@@ -1,7 +1,16 @@
-import { PropertyInputs, CalculationResults } from '../utils/calculations';
-import { ProfitTimerInputs, ProfitTimerResult } from '../utils/profitTimer';
+import { Category, CategorySpending, Expense } from './expense';
+import { ProfitTimerInputs, ProfitTimerResult } from './profitTimer';
+import { CalculationResults, PropertyInputs } from '../utils/calculations';
 
-export type ReportType = 'cashFlow' | 'profitTimer';
+export type ReportType = 'cashFlow' | 'profitTimer' | 'expenses';
+
+export interface ExpensesReportInputs {
+    expenses: Expense[];
+    categories: Category[];
+    categorySpending: CategorySpending[];
+    currency: string;
+    month: string;
+}
 
 export interface Report {
     id: string;
@@ -10,13 +19,13 @@ export interface Report {
     type: ReportType;
     createdAt: string;
     fileUri?: string;
-    inputs?: PropertyInputs | ProfitTimerInputs;
+    inputs?: PropertyInputs | ProfitTimerInputs | ExpensesReportInputs;
     results?: CalculationResults | ProfitTimerResult;
 }
 
 export interface ReportMetadata {
     id: string;
     name: string;
-    scenarioName: string;
-    createdAt: string;
+    date: string;
+    type: ReportType;
 }

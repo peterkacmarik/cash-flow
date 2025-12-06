@@ -22,6 +22,13 @@ const LANGUAGES = [
     { code: 'sk', name: 'Slovenčina', flag: '🇸🇰' },
 ];
 
+const THEMES = [
+    { code: 'light', name: 'settings.lightTheme', icon: '☀️' },
+    { code: 'dark', name: 'settings.darkTheme', icon: '🌙' },
+];
+
+
+
 interface SettingsScreenProps {
     onScenariosDeleted?: () => void;
 }
@@ -48,6 +55,14 @@ export default function SettingsScreen({ onScenariosDeleted }: SettingsScreenPro
             Alert.alert(t('common.error'), 'Failed to change language');
         }
     };
+
+    const handleThemeChange = async (selectedTheme: string) => {
+        if (theme !== selectedTheme) {
+            await toggleTheme();
+        }
+    };
+
+
 
     const handleDeleteAllScenarios = () => {
         Alert.alert(
@@ -118,6 +133,39 @@ export default function SettingsScreen({ onScenariosDeleted }: SettingsScreenPro
         );
     };
 
+    const handleDeleteAllExpenses = () => {
+        Alert.alert(
+            t('settings.deleteAllExpenses'),
+            t('settings.deleteAllExpensesConfirm'),
+            [
+                { text: t('common.cancel'), style: 'cancel' },
+                {
+                    text: t('common.delete'),
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await dataService.deleteAllExpenses(user?.id);
+                            Alert.alert(
+                                t('common.success'),
+                                t('settings.deleteAllExpensesSuccess'),
+                                [
+                                    {
+                                        text: 'OK',
+                                        onPress: () => {
+                                            notifyDataChanged();
+                                        }
+                                    }
+                                ]
+                            );
+                        } catch (error) {
+                            Alert.alert(t('common.error'), t('settings.deleteAllExpensesError'));
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
     const handleDeleteAllReports = () => {
         Alert.alert(
             t('reports.deleteAllReports'),
@@ -152,53 +200,89 @@ export default function SettingsScreen({ onScenariosDeleted }: SettingsScreenPro
     };
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.contentContainer}>
             {/* Language Section */}
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>{t('settings.language')}</Text>
-                <Text style={styles.sectionDescription}>{t('settings.languageDescription')}</Text>
+            <View style={[styles.section, { backgroundColor: colors.card, shadowColor: colors.shadow }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('settings.language')}</Text>
+                <Text style={[styles.sectionDescription, { color: colors.textSecondary }]}>{t('settings.languageDescription')}</Text>
                 {LANGUAGES.map((lang) => (
                     <TouchableOpacity
                         key={lang.code}
                         style={[
                             styles.option,
-                            i18n.language === lang.code && styles.selectedOption,
+                            { backgroundColor: colors.inputBackground, borderColor: colors.border },
+                            i18n.language === lang.code && {
+                                borderColor: colors.primary,
+                                backgroundColor: theme === 'dark' ? colors.primary + '20' : '#e3f2fd'
+                            },
                         ]}
                         onPress={() => handleLanguageChange(lang.code)}
                     >
                         <View style={styles.optionContent}>
                             <Text style={styles.flag}>{lang.flag}</Text>
-                            <Text style={styles.optionText}>{lang.name}</Text>
+                            <Text style={[styles.optionText, { color: colors.text }]}>{lang.name}</Text>
                         </View>
                         {i18n.language === lang.code && (
-                            <Text style={styles.checkmark}>✓</Text>
+                            <Text style={[styles.checkmark, { color: colors.primary }]}>✓</Text>
+                        )}
+                    </TouchableOpacity>
+                ))}
+            </View>
+
+            {/* Appearance Section */}
+            <View style={[styles.section, { backgroundColor: colors.card, shadowColor: colors.shadow }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('settings.appearance')}</Text>
+                <Text style={[styles.sectionDescription, { color: colors.textSecondary }]}>{t('settings.appearanceDescription')}</Text>
+                {THEMES.map((item) => (
+                    <TouchableOpacity
+                        key={item.code}
+                        style={[
+                            styles.option,
+                            { backgroundColor: colors.inputBackground, borderColor: colors.border },
+                            theme === item.code && {
+                                borderColor: colors.primary,
+                                backgroundColor: theme === 'dark' ? colors.primary + '20' : '#e3f2fd'
+                            },
+                        ]}
+                        onPress={() => handleThemeChange(item.code)}
+                    >
+                        <View style={styles.optionContent}>
+                            <Text style={styles.flag}>{item.icon}</Text>
+                            <Text style={[styles.optionText, { color: colors.text }]}>{t(item.name)}</Text>
+                        </View>
+                        {theme === item.code && (
+                            <Text style={[styles.checkmark, { color: colors.primary }]}>✓</Text>
                         )}
                     </TouchableOpacity>
                 ))}
             </View>
 
             {/* Currency Section */}
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>{t('settings.currency')}</Text>
-                <Text style={styles.sectionDescription}>{t('settings.currencyDescription')}</Text>
+            <View style={[styles.section, { backgroundColor: colors.card, shadowColor: colors.shadow }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('settings.currency')}</Text>
+                <Text style={[styles.sectionDescription, { color: colors.textSecondary }]}>{t('settings.currencyDescription')}</Text>
                 {CURRENCIES.map((curr) => (
                     <TouchableOpacity
                         key={curr}
                         style={[
                             styles.option,
-                            currency === curr && styles.selectedOption,
+                            { backgroundColor: colors.inputBackground, borderColor: colors.border },
+                            currency === curr && {
+                                borderColor: colors.primary,
+                                backgroundColor: theme === 'dark' ? colors.primary + '20' : '#e3f2fd'
+                            },
                         ]}
                         onPress={() => handleCurrencyChange(curr)}
                     >
                         <View style={styles.optionContent}>
-                            <Text style={styles.currencySymbol}>{getCurrencySymbol(curr)}</Text>
+                            <Text style={[styles.currencySymbol, { color: colors.text }]}>{getCurrencySymbol(curr)}</Text>
                             <View>
-                                <Text style={styles.optionText}>{curr}</Text>
-                                <Text style={styles.currencyName}>{getCurrencyName(curr)}</Text>
+                                <Text style={[styles.optionText, { color: colors.text }]}>{curr}</Text>
+                                <Text style={[styles.currencyName, { color: colors.textSecondary }]}>{getCurrencyName(curr)}</Text>
                             </View>
                         </View>
                         {currency === curr && (
-                            <Text style={styles.checkmark}>✓</Text>
+                            <Text style={[styles.checkmark, { color: colors.primary }]}>✓</Text>
                         )}
                     </TouchableOpacity>
                 ))}
@@ -208,19 +292,25 @@ export default function SettingsScreen({ onScenariosDeleted }: SettingsScreenPro
             <View style={[styles.section, { backgroundColor: colors.card, shadowColor: colors.shadow }]}>
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('settings.data')}</Text>
                 <TouchableOpacity
-                    style={styles.dangerButton}
+                    style={[styles.dangerButton, { backgroundColor: colors.danger }]}
                     onPress={handleDeleteAllScenarios}
                 >
                     <Text style={styles.dangerButtonText}>{t('settings.deleteAllScenarios')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                    style={[styles.dangerButton, { marginTop: 10 }]}
+                    style={[styles.dangerButton, { marginTop: 10, backgroundColor: colors.danger }]}
                     onPress={handleDeleteAllProfitTimerCalculations}
                 >
                     <Text style={styles.dangerButtonText}>{t('settings.deleteAllProfitTimerCalculations')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                    style={[styles.dangerButton, { marginTop: 10 }]}
+                    style={[styles.dangerButton, { marginTop: 10, backgroundColor: colors.danger }]}
+                    onPress={handleDeleteAllExpenses}
+                >
+                    <Text style={styles.dangerButtonText}>{t('settings.deleteAllExpenses')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.dangerButton, { marginTop: 10, backgroundColor: colors.danger }]}
                     onPress={handleDeleteAllReports}
                 >
                     <Text style={styles.dangerButtonText}>{t('reports.deleteAllReports')}</Text>
@@ -228,11 +318,11 @@ export default function SettingsScreen({ onScenariosDeleted }: SettingsScreenPro
             </View>
 
             {/* About Section */}
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>{t('settings.about')}</Text>
+            <View style={[styles.section, { backgroundColor: colors.card, shadowColor: colors.shadow }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('settings.about')}</Text>
                 <View style={styles.aboutRow}>
-                    <Text style={styles.aboutLabel}>{t('settings.version')}</Text>
-                    <Text style={styles.aboutValue}>1.0.0</Text>
+                    <Text style={[styles.aboutLabel, { color: colors.textSecondary }]}>{t('settings.version')}</Text>
+                    <Text style={[styles.aboutValue, { color: colors.text }]}>1.0.0</Text>
                 </View>
             </View>
         </ScrollView>

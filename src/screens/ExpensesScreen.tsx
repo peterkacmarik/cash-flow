@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -7,19 +7,20 @@ import {
     TouchableOpacity,
     RefreshControl,
     Alert,
+    Modal,
+    TextInput,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
-import { TabView, SceneMap, TabBar } from 'react-native-tab-view';
+import { TabView, SceneMap, TabBar, SceneRendererProps, NavigationState } from 'react-native-tab-view';
 import { useWindowDimensions } from 'react-native';
 import { Expense, Category, CategorySpending } from '../types/expense';
 import {
     getCurrentMonth,
-    getMonthlyData,
-    getCategorySpending,
-    updateCategoryBudget,
     generateId,
 } from '../utils/expenseStorage';
 import { dataService } from '../services/dataService';
@@ -30,15 +31,16 @@ import CategoryFormModal from '../components/CategoryFormModal';
 import AddExpenseModal from '../components/AddExpenseModal';
 import CategoryOptionsModal from '../components/CategoryOptionsModal';
 import ExpenseOptionsModal from '../components/ExpenseOptionsModal';
+import { generateExpensesPDFReport } from '../utils/pdfGenerator';
 
 export default function ExpensesScreen() {
     const { t, i18n } = useTranslation();
-    const { colors } = useSettings();
+    const { colors, dataVersion } = useSettings();
     const { user } = useAuth(); // Get user
     const layout = useWindowDimensions();
 
     const [index, setIndex] = useState(0);
-    const routes = React.useMemo(() => [
+    const routes = (React as any).useMemo(() => [
         { key: 'overview', title: t('expenses.overview') },
         { key: 'expenses', title: t('expenses.allExpenses') },
         { key: 'categories', title: t('expenses.categories') },
@@ -90,6 +92,9 @@ export default function ExpensesScreen() {
         expense: undefined,
     });
 
+    const [reportModalVisible, setReportModalVisible] = useState(false);
+    const [reportName, setReportName] = useState('');
+
     const loadData = async () => {
         try {
             // Load from secure service
@@ -110,9 +115,9 @@ export default function ExpensesScreen() {
             // SHORTCUT for this task: Re-implement the aggregation logic here using the data we just fetched.
 
             const totalSpentCalc = monthlyExpenses.reduce((sum, e) => sum + e.amount, 0);
-            const budgetTotalCalc = cats.reduce((sum: number, c: any) => sum + (c.budget || 0), 0);
+            const budgetTotalCalc = cats.reduce((sum: number, c: Category) => sum + (c.budget || 0), 0);
 
-            const catSpendingCalc = cats.map((category: any) => {
+            const catSpendingCalc = cats.map((category: Category) => {
                 const catExpenses = monthlyExpenses.filter((e) => e.category === category.id);
                 const spent = catExpenses.reduce((sum, e) => sum + e.amount, 0);
                 const percentage = category.budget > 0 ? (spent / category.budget) * 100 : 0;
@@ -141,7 +146,7 @@ export default function ExpensesScreen() {
     useFocusEffect(
         useCallback(() => {
             loadData();
-        }, [currentMonth])
+        }, [currentMonth, dataVersion])
     );
 
     const onRefresh = async () => {
@@ -242,6 +247,62 @@ export default function ExpensesScreen() {
         );
     };
 
+    const handleGenerateReport = () => {
+        const monthName = new Date(currentMonth + '-01').toLocaleDateString('sk-SK', { month: 'long', year: 'numeric' });
+        const defaultName = `${t('expenses.title')} - ${monthName}`;
+        setReportName(defaultName);
+        setReportModalVisible(true);
+    };
+
+    const confirmGenerateReport = async () => {
+        if (!reportName.trim()) {
+            Alert.alert(t('common.error'), t('reports.nameRequired'));
+            return;
+        }
+
+        try {
+            setReportModalVisible(false);
+
+            const monthName = new Date(currentMonth + '-01').toLocaleDateString('sk-SK', { month: 'long', year: 'numeric' });
+            const inputs = {
+                expenses,
+                categories,
+                categorySpending,
+                currency: 'EUR',
+                month: monthName
+            };
+
+            const fileUri = await generateExpensesPDFReport(
+                reportName,
+                expenses,
+                categories,
+                categorySpending,
+                'EUR',
+                monthName
+            );
+
+            await dataService.saveReport({
+                id: generateId(),
+                name: reportName,
+                scenarioName: monthName,
+                type: 'expenses',
+                createdAt: new Date().toISOString(),
+                fileUri,
+                inputs: inputs,
+                results: {} as any, // Expenses don't have separate results, but field is optional/polymorphic
+            }, user?.id);
+
+            Alert.alert(
+                t('common.success'),
+                t('reports.generated'),
+                [{ text: t('common.ok') }]
+            );
+        } catch (error) {
+            console.error('Error generating report:', error);
+            Alert.alert(t('common.error'), t('reports.generateError'));
+        }
+    };
+
     const renderOverview = () => (
         <ScrollView
             style={styles.tabContent}
@@ -279,6 +340,13 @@ export default function ExpensesScreen() {
                 )
                 }
             </View >
+
+            <TouchableOpacity
+                style={[styles.generateButton, { backgroundColor: colors.primary }]}
+                onPress={handleGenerateReport}
+            >
+                <Text style={styles.generateButtonText}>📄 {t('reports.generatePDF')}</Text>
+            </TouchableOpacity>
 
             <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('expenses.recentExpenses')}</Text>
@@ -371,16 +439,23 @@ export default function ExpensesScreen() {
         categories: CategoriesRoute,
     });
 
-    const renderTabBar = (props: any) => (
-        <TabBar
-            {...props}
-            indicatorStyle={[styles.indicator, { backgroundColor: colors.primary }]}
-            style={[styles.tabBar, { backgroundColor: colors.tabBar, borderBottomColor: colors.border }]}
-            labelStyle={styles.label}
-            activeColor={colors.tabBarActive}
-            inactiveColor={colors.tabBarInactive}
-        />
-    );
+    const renderTabBar = (props: SceneRendererProps & { navigationState: NavigationState<{ key: string; title: string }> }) => {
+        const TabBarComponent = TabBar as unknown as React.ComponentType<any>;
+        return (
+            <TabBarComponent
+                {...props}
+                indicatorStyle={[styles.indicator, { backgroundColor: colors.primary }]}
+                style={[styles.tabBar, { backgroundColor: colors.tabBar, borderBottomColor: colors.border }]}
+                activeColor={colors.tabBarActive}
+                inactiveColor={colors.tabBarInactive}
+                renderLabel={({ route, focused, color }: { route: { title: string }; focused: boolean; color: string }) => (
+                    <Text style={[{ color, margin: 8 }, styles.label]}>
+                        {route.title}
+                    </Text>
+                )}
+            />
+        );
+    };
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -445,6 +520,44 @@ export default function ExpensesScreen() {
                 }}
                 onDelete={(expense) => handleDeleteExpense(expense)}
             />
+
+            <Modal
+                visible={reportModalVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setReportModalVisible(false)}
+            >
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.modalOverlay}
+                >
+                    <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+                        <Text style={[styles.modalTitle, { color: colors.text }]}>{t('reports.reportName')}</Text>
+                        <TextInput
+                            style={[styles.modalInput, { backgroundColor: colors.inputBackground, borderColor: colors.border, color: colors.text }]}
+                            value={reportName}
+                            onChangeText={setReportName}
+                            placeholder={t('reports.enterName')}
+                            placeholderTextColor={colors.textSecondary}
+                        />
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, { backgroundColor: colors.inputBackground }]}
+                                onPress={() => setReportModalVisible(false)}
+                            >
+                                <Text style={[styles.modalButtonText, { color: colors.textSecondary }]}>{t('common.cancel')}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.modalButtonPrimary, { backgroundColor: colors.primary }]}
+                                onPress={confirmGenerateReport}
+                            >
+                                <Text style={[styles.modalButtonText, { color: '#fff' }]}>{t('common.save')}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
+
         </View>
     );
 }
@@ -594,6 +707,71 @@ const styles = StyleSheet.create({
     },
     addCategoryText: {
         color: '#3498db',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+
+    generateButton: {
+        marginHorizontal: 16,
+        marginBottom: 16,
+        paddingVertical: 14,
+        borderRadius: 12,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    generateButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContent: {
+        width: '85%',
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 5,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 16,
+        textAlign: 'center',
+    },
+    modalInput: {
+        borderWidth: 1,
+        borderRadius: 8,
+        padding: 12,
+        fontSize: 16,
+        marginBottom: 20,
+    },
+    modalButtons: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    modalButton: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    modalButtonPrimary: {
+        backgroundColor: '#3498db',
+    },
+    modalButtonText: {
         fontSize: 16,
         fontWeight: '600',
     },

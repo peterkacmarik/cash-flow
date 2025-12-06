@@ -241,6 +241,22 @@ export const dataService = {
         }
     },
 
+    async deleteAllExpenses(userId?: string): Promise<void> {
+        if (userId) {
+            const { error } = await supabase
+                .from('expenses')
+                .delete()
+                .eq('user_id', userId);
+
+            if (error) {
+                console.error('Error deleting all expenses from Supabase:', error);
+                throw error;
+            }
+        } else {
+            await AsyncStorage.removeItem('@expenses');
+        }
+    },
+
     // --- CATEGORIES ---
 
     async getCategories(userId?: string): Promise<any[]> {
@@ -261,8 +277,8 @@ export const dataService = {
             const { data, error } = await supabase.from('categories').select('*');
             if (error) throw error;
 
-            // Merge logic: DB custom vs Defaults
-            const dbCategories = data.map((item: any) => ({
+            // Return only DB categories for logged-in users
+            return data.map((item: any) => ({
                 id: item.id,
                 name: item.name,
                 icon: item.icon,
@@ -270,18 +286,8 @@ export const dataService = {
                 budget: item.budget,
                 isCustom: item.is_custom,
             }));
-
-            const merged = [...dbCategories];
-
-            // Add defaults that are not present in DB
-            defaultCategories.forEach(defCat => {
-                if (!merged.find(c => c.id === defCat.id)) {
-                    merged.push(defCat);
-                }
-            });
-
-            return merged;
         } else {
+            // Guest mode: use default categories from AsyncStorage
             try {
                 const data = await AsyncStorage.getItem('@categories');
                 if (data) return JSON.parse(data);

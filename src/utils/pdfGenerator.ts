@@ -1,8 +1,8 @@
 import * as Print from 'expo-print';
-import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system';
 import { CalculationResults, PropertyInputs, calculateCashFlow } from './calculations'; // calculateCashFlow added for profit timer previous value
 import { ProfitTimerInputs, ProfitTimerResult } from './profitTimer';
+import { Expense, Category, CategorySpending } from '../types/expense';
 
 const formatCurrency = (amount: number, currency: string) => {
     return new Intl.NumberFormat('sk-SK', {
@@ -40,6 +40,8 @@ const getCommonStyles = () => `
     .timeline-table tr:nth-child(even) { background: #f8f9fa; }
     .timeline-row-positive { background-color: #d4edda !important; }
     .timeline-row-positive td { color: #155724; }
+    .timeline-row-negative { background-color: #f8d7da !important; }
+    .timeline-row-negative td { color: #721c24; }
 `;
 
 const generateCashFlowContent = (inputs: PropertyInputs, results: CalculationResults, currency: string) => {
@@ -49,7 +51,7 @@ const generateCashFlowContent = (inputs: PropertyInputs, results: CalculationRes
         <div class="grid">
             <div class="item"><div class="label">Kúpna cena</div><div class="value">${formatCurrency(inputs.kupnaCena, currency)}</div></div>
             <div class="item"><div class="label">Vlastné zdroje</div><div class="value">${formatCurrency(inputs.vlastneZdroje, currency)}</div></div>
-            <div class="item"><div class="label">Úroková sadzba</div><div class="value">${formatPercentage(inputs.urokovaSadzba)}</div></div>
+            <div class="item"><div class="label">Úroková sadzba</div><div class="value">${formatPercentage(inputs.urok)}</div></div>
             <div class="item"><div class="label">Doba splatnosti</div><div class="value">${inputs.dobaSplatnosti} rokov</div></div>
         </div>
     </div>
@@ -147,20 +149,163 @@ const generateProfitTimerContent = (inputs: ProfitTimerInputs, results: ProfitTi
     `;
 };
 
+const generateExpensesContent = (
+    expenses: Expense[],
+    categories: Category[],
+    categorySpending: CategorySpending[],
+    currency: string,
+    month: string
+) => {
+    const totalSpent = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+    const totalBudget = categories.reduce((sum, cat) => sum + cat.budget, 0);
+    const budgetRemaining = totalBudget - totalSpent;
+    const budgetUsedPercentage = totalBudget > 0 ? (totalSpent / totalBudget * 100) : 0;
+
+    // Category breakdown rows
+    const categoryRows = categorySpending
+        .sort((a, b) => b.spent - a.spent)
+        .map(cs => `
+            <tr class="${cs.isOverBudget ? 'timeline-row-negative' : ''}">
+                <td>${cs.category.icon} ${cs.category.name}</td>
+                <td>${formatCurrency(cs.spent, currency)}</td>
+                <td>${formatCurrency(cs.budget, currency)}</td>
+                <td class="${cs.isOverBudget ? 'negative' : 'highlight'}">${cs.budget > 0 ? cs.percentage.toFixed(1) + '%' : '-'}</td>
+            </tr>
+        `).join('');
+
+    // Expense list rows (sorted by date, most recent first)
+    const expenseRows = expenses
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .map(exp => {
+            const category = categories.find(c => c.id === exp.category);
+            const dateObj = new Date(exp.date);
+            const formattedDate = dateObj.toLocaleDateString('sk-SK');
+            return `
+                <tr>
+                    <td>${formattedDate}</td>
+                    <td>${category?.icon || '📌'} ${category?.name || exp.category}</td>
+                    <td>${formatCurrency(exp.amount, currency)}</td>
+                    <td>${exp.description || '-'}</td>
+                </tr>
+            `;
+        }).join('');
+
+    return `
+    <div class="section">
+        <h2>Prehľad za ${month}</h2>
+        <div class="grid">
+            <div class="item"><div class="label">Celkové výdavky</div><div class="value negative">${formatCurrency(totalSpent, currency)}</div></div>
+            <div class="item"><div class="label">Celkový rozpočet</div><div class="value">${formatCurrency(totalBudget, currency)}</div></div>
+            <div class="item"><div class="label">Zostáva</div><div class="value ${budgetRemaining >= 0 ? 'highlight' : 'negative'}">${formatCurrency(budgetRemaining, currency)}</div></div>
+            <div class="item"><div class="label">Využitie rozpočtu</div><div class="value ${budgetUsedPercentage > 100 ? 'negative' : ''}">${budgetUsedPercentage.toFixed(1)}%</div></div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Výdavky podľa kategórií</h2>
+        <table class="timeline-table">
+            <thead>
+                <tr>
+                    <th>Kategória</th>
+                    <th>Minúté</th>
+                    <th>Rozpočet</th>
+                    <th>% Rozpočtu</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${categoryRows}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Zoznam výdavkov (${expenses.length})</h2>
+        <table class="timeline-table">
+            <thead>
+                <tr>
+                    <th>Dátum</th>
+                    <th>Kategória</th>
+                    <th>Suma</th>
+                    <th>Popis</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${expenseRows}
+            </tbody>
+        </table>
+    </div>
+    `;
+};
+
+import { ExpensesReportInputs } from '../types/report';
+
 export const generatePDFReport = async (
     reportName: string,
-    inputs: PropertyInputs | ProfitTimerInputs,
-    results: CalculationResults | ProfitTimerResult,
+    inputs: PropertyInputs | ProfitTimerInputs | ExpensesReportInputs,
+    results: CalculationResults | ProfitTimerResult | {}, // expenses has no separate results object
     currency: string = 'EUR',
-    type: 'cashFlow' | 'profitTimer' = 'cashFlow'
+    type: 'cashFlow' | 'profitTimer' | 'expenses' = 'cashFlow'
 ): Promise<string> => {
     let content = '';
 
     if (type === 'cashFlow') {
         content = generateCashFlowContent(inputs as PropertyInputs, results as CalculationResults, currency);
-    } else {
+    } else if (type === 'profitTimer') {
         content = generateProfitTimerContent(inputs as ProfitTimerInputs, results as ProfitTimerResult, currency);
+    } else if (type === 'expenses') {
+        const expensesInputs = inputs as ExpensesReportInputs;
+        return generateExpensesPDFReport(
+            reportName,
+            expensesInputs.expenses,
+            expensesInputs.categories,
+            expensesInputs.categorySpending,
+            expensesInputs.currency,
+            expensesInputs.month
+        );
+    } else {
+        throw new Error('Unknown report type');
     }
+
+    const html = `
+    <html>
+        <head>
+            <meta charset="utf-8">
+            <style>
+                ${getCommonStyles()}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>${reportName}</h1>
+                <div class="meta">Vygenerované: ${new Date().toLocaleDateString('sk-SK')}</div>
+            </div>
+            
+            ${content}
+
+            <div class="footer">
+                <p>Vygenerované aplikáciou Cash Flow</p>
+            </div>
+        </body>
+    </html>
+    `;
+
+    const { uri } = await Print.printToFileAsync({
+        html,
+        base64: false
+    });
+
+    return uri;
+};
+
+export const generateExpensesPDFReport = async (
+    reportName: string,
+    expenses: Expense[],
+    categories: Category[],
+    categorySpending: CategorySpending[],
+    currency: string = 'EUR',
+    month: string
+): Promise<string> => {
+    const content = generateExpensesContent(expenses, categories, categorySpending, currency, month);
 
     const html = `
     <html>

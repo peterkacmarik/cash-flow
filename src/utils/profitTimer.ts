@@ -1,30 +1,7 @@
-import { Scenario } from '../types/scenario';
+import { ProfitTimerInputs, ProfitTimerResult, MonthlyTimelineItem } from '../types/profitTimer';
 import { calculateCashFlow } from './calculations';
 
-export interface ProfitTimerInputs {
-    scenario: Scenario;
-    rentGrowthType: 'percentage' | 'fixed';
-    rentGrowthValue: number;
-    expenseReductionType: 'percentage' | 'fixed';
-    expenseReductionValue: number;
-}
-
-export interface MonthlyTimelineItem {
-    month: number;
-    year: number;
-    rent: number;
-    expenses: number;
-    cashFlow: number;
-    isPositive: boolean;
-}
-
-export interface ProfitTimerResult {
-    monthsToPositive: number;
-    yearsToPositive: number;
-    monthlyTimeline: MonthlyTimelineItem[];
-    finalCashFlow: number;
-    isNeverPositive: boolean;
-}
+export { ProfitTimerInputs, ProfitTimerResult, MonthlyTimelineItem };
 
 const MAX_MONTHS = 600; // 50 years limit
 

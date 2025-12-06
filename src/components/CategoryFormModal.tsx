@@ -41,7 +41,7 @@ export default function CategoryFormModal({
     const [name, setName] = useState('');
     const [icon, setIcon] = useState(ICONS[0]);
     const [color, setColor] = useState(COLORS[0]);
-    const [budget, setBudget] = useState('0');
+    const [budget, setBudget] = useState('');
 
     useEffect(() => {
         if (visible) {
@@ -54,7 +54,7 @@ export default function CategoryFormModal({
                 setName('');
                 setIcon(ICONS[0]);
                 setColor(COLORS[0]);
-                setBudget('0');
+                setBudget('');
             }
         }
     }, [visible, category]);
@@ -123,7 +123,16 @@ export default function CategoryFormModal({
                                         {ICONS.map((i) => (
                                             <TouchableOpacity
                                                 key={i}
-                                                style={[styles.iconOption, icon === i && [styles.selectedOption, { borderColor: colors.text }]]}
+                                                style={[
+                                                    styles.iconOption,
+                                                    icon === i && [
+                                                        styles.selectedOption,
+                                                        {
+                                                            borderColor: colors.primary,
+                                                            backgroundColor: colors.primary + '15' // 15 = 8% opacity
+                                                        }
+                                                    ]
+                                                ]}
                                                 onPress={() => setIcon(i)}
                                             >
                                                 <Text style={styles.iconText}>{i}</Text>
@@ -141,7 +150,7 @@ export default function CategoryFormModal({
                                                 style={[
                                                     styles.colorOption,
                                                     { backgroundColor: c },
-                                                    color === c && [styles.selectedOption, { borderColor: colors.text }]
+                                                    color === c && [styles.selectedOption, { borderColor: colors.primary }]
                                                 ]}
                                                 onPress={() => setColor(c)}
                                             />
@@ -226,7 +235,7 @@ const styles = StyleSheet.create({
     iconOption: {
         width: 44,
         height: 44,
-        borderRadius: 22,
+        borderRadius: 8,
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,

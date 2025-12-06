@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +10,6 @@ import InfoTooltip from './InfoTooltip';
 import ProfitTimerTimelineChart from './charts/ProfitTimerTimelineChart';
 import ExpenseBreakdownChart from './charts/ExpenseBreakdownChart';
 import ChartCarousel from './charts/ChartCarousel';
-import { Scenario } from '../types/scenario';
 import { generatePDFReport } from '../utils/pdfGenerator';
 import { dataService } from '../services/dataService';
 import { useAuth } from '../context/AuthContext';
@@ -133,7 +133,6 @@ export default function ResultsDisplay({ results, inputs }: ResultsDisplayProps)
                     // Show Profit Timer Timeline only for negative cash flow
                     results.mesacnyCashFlow < 0 && inputs && (
                         <ProfitTimerTimelineChart
-                            key="timeline"
                             results={results}
                             scenario={{
                                 id: 'temp',
@@ -147,7 +146,7 @@ export default function ResultsDisplay({ results, inputs }: ResultsDisplayProps)
                             expenseReductionValue={0}
                         />
                     ),
-                    inputs && <ExpenseBreakdownChart key="expense" inputs={inputs} />,
+                    inputs && <ExpenseBreakdownChart inputs={inputs} />,
                 ].filter(Boolean) as React.ReactNode[]}
             />
 

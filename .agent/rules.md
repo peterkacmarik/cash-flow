@@ -2,6 +2,26 @@
 description: Global rules for the Cash Flow project
 ---
 
+# CRITICAL RULES (MUST FOLLOW)
+
+> [!IMPORTANT]
+> Tieto pravidlá majú najvyššiu prioritu. Ich ignorovanie je neakceptovateľné.
+
+1.  **Workflows sú Zákon:**
+    - Pred začatím akejkoľvek komplexnej úlohy (feature, deploy, db change) si **MUSÍŠ** prečítať príslušný súbor v `.agent/workflows`.
+    - **MUSÍŠ** vykonať každý jeden bod z checklistu vo workflow.
+    - Ak workflow obsahuje `npx tsc` alebo testy, **MUSÍŠ** ich spustiť a opraviť chyby pred ukončením.
+
+2.  **Task Management:**
+    - Vždy používaj `task_boundary` na začiatku a `notify_user` na konci.
+    - Udržuj `task.md` aktuálny.
+
+3.  **Kvalita Kódu:**
+    - Žiadne `any` (pokiaľ nie je absolútne nevyhnutné).
+    - Žiadne `console.log` v produkčnom kóde.
+
+---
+
 # Project Rules
 
 ## 1. Jazyk a Komunikácia

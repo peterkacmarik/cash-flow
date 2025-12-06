@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -17,9 +17,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
-import { TabView, TabBar } from 'react-native-tab-view';
+import { TabView, TabBar, SceneRendererProps, NavigationState } from 'react-native-tab-view';
 import { calculateCashFlow, formatCurrency } from '../utils/calculations';
-import { calculateTimeToPositive, ProfitTimerResult } from '../utils/profitTimer';
+import { calculateTimeToPositive, ProfitTimerResult, MonthlyTimelineItem } from '../utils/profitTimer';
 import { Scenario } from '../types/scenario';
 import { ProfitTimerCalculation } from '../types/profitTimer';
 import { useSettings } from '../context/SettingsContext';
@@ -93,7 +93,7 @@ export default function ProfitTimerScreen() {
             setSavedCalculations(calculations);
 
             // Update selected scenario logic
-            setSelectedScenario(current => {
+            setSelectedScenario((current: Scenario | null) => {
                 if (current) {
                     // Try to find the currently selected scenario in the new list
                     const updated = negativeScenarios.find(s => s.id === current.id);
@@ -153,7 +153,7 @@ export default function ProfitTimerScreen() {
     };
 
     const handleLoadCalculation = (calculation: ProfitTimerCalculation) => {
-        const scenario = scenarios.find(s => s.id === calculation.scenarioId);
+        const scenario = scenarios.find((s: Scenario) => s.id === calculation.scenarioId);
         if (scenario) {
             setSelectedScenario(scenario);
             setRentGrowthType(calculation.rentGrowthType);
@@ -323,7 +323,7 @@ export default function ProfitTimerScreen() {
                 <Text style={[styles.noDataText, { color: colors.textSecondary }]}>{t('profitTimer.noNegativeScenarios')}</Text>
             ) : (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scenarioList}>
-                    {scenarios.map(s => {
+                    {scenarios.map((s: Scenario) => {
                         const cf = calculateCashFlow(s.inputs).mesacnyCashFlow;
                         const isSelected = selectedScenario?.id === s.id;
                         return (
@@ -398,8 +398,8 @@ export default function ProfitTimerScreen() {
                                 <View style={[styles.timelineHeader, { backgroundColor: colors.inputBackground, borderBottomColor: colors.border }]}>
                                     <Text style={[styles.timelineTitle, { color: colors.text }]}>📊 {t('profitTimer.timeline')}</Text>
                                 </View>
-                                {result.monthlyTimeline.filter((_, i) => i % 12 === 0 || i === result.monthlyTimeline.length - 1).slice(0, 10).map((item, index) => (
-                                    <View key={index} style={[styles.timelineCard, { borderBottomColor: colors.border }]}>
+                                {result.monthlyTimeline.filter((_: MonthlyTimelineItem, i: number) => i % 12 === 0 || i === result.monthlyTimeline.length - 1).slice(0, 10).map((item: MonthlyTimelineItem, index: number) => (
+                                    <View key={index.toString()} style={[styles.timelineCard, { borderBottomColor: colors.border }]}>
                                         <View style={[styles.timelineMonthBadge, { backgroundColor: colors.primary + '20' }]}>
                                             <Text style={[styles.timelineMonthText, { color: colors.primary }]}>{t('profitTimer.month')} {item.month}</Text>
                                         </View>
@@ -560,8 +560,8 @@ export default function ProfitTimerScreen() {
                 data={savedCalculations}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.listContainer}
-                renderItem={({ item }) => {
-                    const scenario = scenarios.find(s => s.id === item.scenarioId);
+                renderItem={({ item }: { item: ProfitTimerCalculation }) => {
+                    const scenario = scenarios.find((s: Scenario) => s.id === item.scenarioId);
                     return (
                         <ProfitTimerCalculationCard
                             calculation={item}

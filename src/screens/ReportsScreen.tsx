@@ -1,4 +1,5 @@
-import React, { useState, useCallback } from 'react';
+import * as React from 'react';
+import { useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -14,7 +15,7 @@ import { useTranslation } from 'react-i18next';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Ionicons } from '@expo/vector-icons';
-import { TabView, SceneMap, TabBar } from 'react-native-tab-view';
+import { TabView, TabBar } from 'react-native-tab-view';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { useSettings } from '../context/SettingsContext';
@@ -31,7 +32,7 @@ export default function ReportsScreen() {
 
     // TabView state
     const [index, setIndex] = useState(0);
-    const routes = React.useMemo(() => [
+    const routes = (React as any).useMemo(() => [
         { key: 'cashFlow', title: t('reports.tabs.cashFlow') },
         { key: 'expenses', title: t('reports.tabs.expenses') },
         { key: 'profitTimer', title: t('reports.tabs.profitTimer') },
@@ -65,34 +66,34 @@ export default function ReportsScreen() {
         }, [user?.id, dataVersion])
     );
 
-    const cashFlowReports = reports.filter(r => r.type === 'cashFlow' || !r.type);
-    const profitTimerReports = reports.filter(r => r.type === 'profitTimer');
-
+    // Use casting to Partial to strictly handle potential missing type in legacy data
+    const cashFlowReports = reports.filter((r: Report) => r.type === 'cashFlow' || !(r as Partial<Report>).type);
+    const profitTimerReports = reports.filter((r: Report) => r.type === 'profitTimer');
+    const expensesReports = reports.filter((r: Report) => r.type === 'expenses');
     const getReportUri = async (report: Report): Promise<string | null> => {
         if (report.fileUri && (await FileSystem.getInfoAsync(report.fileUri)).exists) {
             return report.fileUri;
         }
 
-        if (report.inputs && report.results) {
-            try {
-                // Determine currency based on inputs (fallback to global currency if not inferable)
-                // Existing logic assumes global currency which might be mismatched for old reports if currency changed
-                // But for now we stick to global 'currency' context or we should save currency in report
-
+        // If not found, regenerate it
+        try {
+            if (report.inputs) {
+                // Ensure inputs are correctly typed for the generator
+                // The generator handles type checking based on report.type
                 const uri = await generatePDFReport(
                     report.name,
                     report.inputs,
-                    report.results,
-                    currency,
+                    report.results || {}, // Expenses might have empty results
+                    'EUR', // Default currency if not saved (should ideally be saved)
                     report.type
                 );
                 return uri;
-            } catch (error) {
-                console.error('Error generating PDF on demand:', error);
-                return null;
             }
+            return null;
+        } catch (error) {
+            console.error('Error regenerating report:', error);
+            return null;
         }
-        return null;
     };
 
     const handleShare = async (report: Report) => {
@@ -246,15 +247,11 @@ export default function ReportsScreen() {
         <View style={styles.emptyContainer}>
             <Ionicons name="document-text-outline" size={64} color={colors.textSecondary} />
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                {type === 'cashFlow' ? t('reports.noReports') :
-                    type === 'profitTimer' ? t('reports.noProfitTimerReports') :
-                        t('reports.noReports')}
+                {t('reports.noReports')}
             </Text>
-            {type === 'cashFlow' && (
-                <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                    {t('reports.noReportsSubtext')}
-                </Text>
-            )}
+            <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+                {t('reports.noReportsSubtext')}
+            </Text>
         </View>
     );
 
@@ -278,6 +275,16 @@ export default function ReportsScreen() {
         />
     );
 
+    const ExpensesRoute = () => (
+        <FlatList
+            data={expensesReports}
+            renderItem={renderReport}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={() => renderEmpty('expenses')}
+        />
+    );
+
     const ComingSoonRoute = () => (
         <View style={styles.emptyContainer}>
             <Ionicons name="construct-outline" size={64} color={colors.textSecondary} />
@@ -287,13 +294,20 @@ export default function ReportsScreen() {
         </View>
     );
 
-    const renderScene = SceneMap({
-        cashFlow: CashFlowRoute,
-        expenses: ComingSoonRoute,
-        profitTimer: ProfitTimerRoute,
-    });
+    const renderScene = ({ route }: { route: { key: string } }) => {
+        switch (route.key) {
+            case 'cashFlow':
+                return <CashFlowRoute />;
+            case 'expenses':
+                return <ExpensesRoute />;
+            case 'profitTimer':
+                return <ProfitTimerRoute />;
+            default:
+                return null;
+        }
+    };
 
-    const renderTabBar = (props: any) => (
+    const renderTabBar = useCallback((props: any) => (
         <TabBar
             {...props}
             indicatorStyle={[styles.indicator, { backgroundColor: colors.primary }]}
@@ -302,7 +316,7 @@ export default function ReportsScreen() {
             activeColor={colors.tabBarActive}
             inactiveColor={colors.tabBarInactive}
         />
-    );
+    ), [colors]);
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
