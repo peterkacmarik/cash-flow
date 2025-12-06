@@ -70,6 +70,6 @@ Dodržiavaj túto štruktúru:
 - **Veľké zmeny:** Pri komplexných zmenách v súbore zváž prepísanie celého súboru (`write_to_file` s `Overwrite: true`) namiesto `replace_file_content`, aby sa predišlo chybám v kontexte.
 
 ## 7. Kľúčové Slová
-- **"Funguje":** Ak používateľ napíše "funguje" (alebo "je to ok", "hotovo"), **automaticky** vykonaj `git add .` a `git commit`.
+- **"Funguje":** Ak používateľ napíše "funguje" (alebo "je to ok", "hotovo"), **automaticky** vykonaj `git add .`, `git commit` a **`git push`**.
   - Správa commitu musí stručne popisovať, čo sa práve dokončilo (napr. `feat: implement login screen` alebo `fix: resolve crash on startup`).
-  - Nemusíš sa pýtať na povolenie, ber to ako príkaz na uloženie checkpointu.
+  - Nemusíš sa pýtať na povolenie, ber to ako príkaz na uloženie checkpointu a nahratie na server.
