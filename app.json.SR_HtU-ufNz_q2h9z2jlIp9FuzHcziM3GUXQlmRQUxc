@@ -15,10 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.cashflow.calculator",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
+      "bundleIdentifier": "com.cashflow.calculator"
     },
     "android": {
       "package": "com.cashflow.calculator",
@@ -37,6 +34,9 @@
       "eas": {
         "projectId": "a02b6fc1-b676-495b-b80b-1eefad35a9da"
       }
-    }
+    },
+    "plugins": [
+      "expo-font"
+    ]
   }
 }
